@@ -27,26 +27,29 @@ define(['underscore'], function (_){
         if (obj) {
             // Object to UI
             _.each(obj, function (value, key) {
-                var name = key.replace(/[A-Z]/g, function (a) {
-                    return '-' + a.toLowerCase();
-                });
-
                 if (_.isArray(value)) {
                     _.each(value, function (element, index) {
                         var obj = {};
-                        obj[name + '-' + index] = element;
+                        obj[key + '\\[' + index + '\\]'] = element;
                         exchange($el, obj);
                     });
                     return;
                 }
 
-                var element = $el.find('[data-name=' + name + ']');
+                var element = $el.find('[data-name=' + key + ']');
                 if (element.size() == 0) {
+                    var name = key.replace(/[A-Z]/g, function (a) {
+                        return '-' + a.toLowerCase();
+                    });
+                    name = name.replace(/[^\[\-0-9][0-9]+/g, function (a) {
+                        return a.charAt(0) + '-' + a.slice(1);
+                    });
+
                     element = $el.find('[name=' + name + ']');
                 }
 
                 var base = element.attr('data-base');
-                if (base) {
+                if (base && value) {
                     value = value.toString(base).toUpperCase();
                 }
 
@@ -69,7 +72,16 @@ define(['underscore'], function (_){
         } else {
             // UI to Object
             var result = {};
-            _.each($el.find('input:not(:radio),input[type=radio]:checked,select'), function (element) {
+            _.each($el.find('input,select'), function (element) {
+
+                if ($(element).is(':radio:not(:checked)')){
+                    return;
+                }
+
+                if (!$(element).attr('name')){
+                    return;
+                } 
+
                 var key = $(element).attr('name').replace(/(-.)/g, function (a) {
                     return a.charAt(1).toUpperCase()
                 });
@@ -80,29 +92,34 @@ define(['underscore'], function (_){
 
                 var value = $(element).val();
 
-                if ($(element).is('[type=number],[data-type=number]')) {
-                    // Integer
-                    var base = parseInt($(element).attr('data-base')) || 10;
-                    value = parseInt(value, base) || 0;
-                } else if ($(element).is('[data-type=float]')) {
-                    // Floating point number
-                    value = parseFloat(value) || 0.0;
-                } else if ($(element).is('[data-type=boolean]')) {
-                    // Boolean
-                    if ($(element).is(':checkbox')) {
-                        value = $(element).is(':checked');
-                    } else {
-                        if (value.toLowerCase() == 'true') {
-                            value = true;
-                        } else if (value.toLowerCase() == 'false') {
-                            value = false;
+                if ($(element).is(':checkbox:not(:checked)[data-type!=boolean]')) {
+                    // Sets value of unchecked checkbox undefined when data-type is not boolean
+                    value = undefined;
+                } else {
+                    if ($(element).is('[type=number],[data-type=number]')) {
+                        // Integer
+                        var base = parseInt($(element).attr('data-base')) || 10;
+                        value = parseInt(value, base) || 0;
+                    } else if ($(element).is('[data-type=float]')) {
+                        // Floating point number
+                        value = parseFloat(value) || 0.0;
+                    } else if ($(element).is('[data-type=boolean]')) {
+                        // Boolean
+                        if ($(element).is(':checkbox')) {
+                            value = $(element).is(':checked');
                         } else {
-                            value = value ? true : false;
+                            if (value.toLowerCase() == 'true') {
+                                value = true;
+                            } else if (value.toLowerCase() == 'false') {
+                                value = false;
+                            } else {
+                                value = value ? true : false;
+                            }
                         }
                     }
                 }
 
-                var arrayExp = /[0-9]+$/
+                var arrayExp = /\[[0-9]+\]$/
                 if (arrayExp.test(key)) {
                     // Array
                     key = key.replace(arrayExp, '');
